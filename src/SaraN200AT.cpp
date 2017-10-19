@@ -1,7 +1,6 @@
 #include "SaraN200AT.h"
 
 SaraN200AT::SaraN200AT():
-modemStream(stream),
 debugStream(NULL),
 debugEnabled(false),
 inputBuffer(0),
@@ -149,67 +148,68 @@ size_t SaraN200AT::writeByte(uint8_t value) {
 }
 
 size_t SaraN200AT::print(const __FlashStringHelper* fsh) {
-    writeProlog():
+    writeProlog();
     // TODO: print debug
     return modemStream->print(fsh);
 }
 
 size_t SaraN200AT::print(const String& buffer) {
-    writeProlog():
+    writeProlog();
     // TODO: print debug
     return modemStream->print(buffer);
 }
 
-size_t SaraN200AT::print(const char[] buffer) {
-    writeProlog():
+size_t SaraN200AT::print(const char* buffer) {
+    writeProlog();
     // TODO: print debug
     return modemStream->print(buffer);
 }
 
 size_t SaraN200AT::print(char c) {
-    writeProlog():
+    writeProlog();
     // TODO: print debug
     return modemStream->print(c);
 }
 
-size_t SaraN200AT::print(unsigned char uc, int base = DEC) {
-    writeProlog():
+size_t SaraN200AT::print(unsigned char uc, int base) {
+    writeProlog();
     // TODO: print debug
     return modemStream->print(uc, base);
 }
 
-size_t SaraN200AT::print(int i, int base = DEC) {
-    writeProlog():
+size_t SaraN200AT::print(int i, int base) {
+    writeProlog();
     // TODO: print debug
     return modemStream->print(i, base);
 }
 
-size_t SaraN200AT::print(unsigned int ui, int base = DEC) {
-    writeProlog():
+size_t SaraN200AT::print(unsigned int ui, int base) {
+    writeProlog();
     // TODO: print debug
     return modemStream->print(ui, base);
 }
 
-size_t SaraN200AT::print(long l, int base = DEC) {
-    writeProlog():
+size_t SaraN200AT::print(long l, int base) {
+    writeProlog();
     // TODO: print debug
     return modemStream->print(l, base);
 }
 
-size_t SaraN200AT::print(unsigned long ul, int base = DEC) {
-    writeProlog():
+
+size_t SaraN200AT::print(unsigned long ul, int base) {
+    writeProlog();
     // TODO: print debug
     return modemStream->print(ul, base);
 }
 
-size_t SaraN200AT::print(double d, int base = DEC) {
-    writeProlog():
+size_t SaraN200AT::print(double d, int base) {
+    writeProlog();
     // TODO: print debug
     return modemStream->print(d, base);
 }
 
 size_t SaraN200AT::print(const Printable& printable) {
-    writeProlog():
+    writeProlog();
     // TODO: print debug
     return modemStream->print(printable);
 }
@@ -226,7 +226,8 @@ size_t SaraN200AT::println(const String& s) {
     return n;
 }
 
-size_t SaraN200AT::println(const char c[]) {
+
+size_t SaraN200AT::println(const char* c) {
     size_t n = print(c);
     n += println();
     return n;
@@ -267,7 +268,7 @@ size_t SaraN200AT::println(double num, int digits) {
     writeProlog();
     debugPrint(num, digits);
 
-    return _modemStream->println(num, digits);
+    return modemStream->println(num, digits);
 }
 
 size_t SaraN200AT::println(const Printable& x) {
@@ -278,6 +279,6 @@ size_t SaraN200AT::println(const Printable& x) {
 size_t SaraN200AT::println(void) {
     // TODO: print debug
     size_t i = print('\r');
-    _appendCommand = false;
+    appendCommand = false;
     return i;
 }

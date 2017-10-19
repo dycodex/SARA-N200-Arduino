@@ -5,12 +5,6 @@
 #include <Stream.h>
 #include "SaraN200AT.h"
 
-#if defined(ESP32)
-#undef max
-#undef min
-#include <functional>
-#endif
-
 typedef struct NameValuePair {
     const char* Name;
     const char* Value;
@@ -21,7 +15,7 @@ public:
     SaraN200();
     virtual ~SaraN200() {}
 
-    typedef std::function<ResponseType(ResponseType&, const char*, size_t, void*, void*)> CallbackMethodPtr;
+    typedef ResponseType(*CallbackMethodPtr)(ResponseType& response, const char* buffer, size_t size, void* param, void* param2);
 
     void init(Stream* stream);
     bool setRadioActive(bool on);
@@ -61,11 +55,11 @@ protected:
     };
 
     template<typename T1, typename T2>
-    ResponseType readResponse(CallbackMethodPtr parserMethod,
+    ResponseType readResponse(ResponseType(*parserMethod)(ResponseType& response, const char* parseBuffer, size_t size, T1* parameter, T2* parameter2),
                                T1* callbackParameter, T2* callbackParameter2,
                                size_t* outSize = NULL, uint32_t timeout = 5000)
     {
-        return readResponse(inputBuffer, inputBufferSize, parserMethod,
+        return readResponse(inputBuffer, inputBufferSize, (CallbackMethodPtr)parserMethod,
                             (void*)callbackParameter, (void*)callbackParameter2, outSize, timeout);
     };
 
@@ -76,6 +70,12 @@ private:
     bool setConfigParam(const char* param, const char* value);
     bool checkAndApplyNconfig();
     void reboot();
+
+    static ResponseType cgAttParser(ResponseType& response, const char* buffer, size_t size, uint8_t* result, uint8_t* unused);
+    static ResponseType csqParser(ResponseType& response, const char* buffer, size_t size, int* csqResult, int* berResult);
+    static ResponseType createSocketParser(ResponseType& response, const char* buffer, size_t size, int* socketFd, int* unused);
+    static ResponseType socketSendToParser(ResponseType& response, const char* buffer, size_t size, int* socketFd, int* length);
+    static ResponseType checkAndApplyNconfigParser(ResponseType& response, const char* buffer, size_t size, bool* result, uint8_t* unused);
 };
 
 #endif

@@ -28,7 +28,7 @@
 
 #define NOW (uint32_t)millis()
 
-static const nConfigCount = 3;
+static const int nConfigCount = 3;
 static NameValuePair nConfig[nConfigCount] = {
     {"AUTOCONNECT", "TRUE"},
     {"CR_0354_0338_SCRAMBLING", "TRUE"},
@@ -64,8 +64,8 @@ bool SaraN200::setRadioActive(bool on) {
     return readResponse() == ResponseOK;
 }
 
-ResponseType SaraN200::readResponse(char* buffer, size_t, CallbackMethodPtr parserMethod, void* callbackParameter, void* callbackParameter2, size_t* outSize, uint32_t timeout) {
-    ResponSeType response = ResponseNotFound;
+ResponseType SaraN200::readResponse(char* buffer, size_t size, CallbackMethodPtr parserMethod, void* callbackParameter, void* callbackParameter2, size_t* outSize, uint32_t timeout) {
+    ResponseType response = ResponseNotFound;
     uint32_t from = NOW;
 
     do {
@@ -123,14 +123,14 @@ ResponseType SaraN200::readResponse(char* buffer, size_t, CallbackMethodPtr pars
         *outSize = 0;
     }
 
-    debugPrintLn("[read response]: timed out");
+    debugPrintln("[read response]: timed out");
     return ResponseTimeout;
 }
 
-bool SaraN200::createContet(const char* apn) {
+bool SaraN200::createContext(const char* apn) {
     print("AT+CGDCONT=" DEFAULT_CID ",\"IP\",\"");
     print(apn);
-    pritnln("\"");
+    println("\"");
 
     return readResponse() == ResponseOK;
 }
@@ -139,25 +139,25 @@ bool SaraN200::isConnected() {
     uint8_t value = 0;
     println("AT+CGATT?");
 
-    auto parser = [&](ResponseType response, const char* buffer, size_t size, uint8_t* result, uint8_t* unused) {
-        if (!result) {
-            return ResponseError;
-        }
-
-        int val;
-        if (sscanf(buffer, "+CGATT: %d", &val) == 1) {
-            *result = val;
-            return ResponseEmpty;
-        }
-
-        return ResponseError;
-    };
-
-    if (readResponse<uint8_t, uint8_t>(parser, &value, NULL) == ResponseOK) {
+    if (readResponse<uint8_t, uint8_t>(cgAttParser, &value, NULL) == ResponseOK) {
         return value == 1;
     }
 
     return false;
+}
+
+ResponseType SaraN200::cgAttParser(ResponseType& response, const char* buffer, size_t size, uint8_t* result, uint8_t* unused) {
+    if (!result) {
+        return ResponseError;
+    }
+
+    int val;
+    if (sscanf(buffer, "+CGATT: %d", &val) == 1) {
+        *result = val;
+        return ResponseEmpty;
+    }
+
+    return ResponseError;
 }
 
 bool SaraN200::disconnect() {
@@ -211,18 +211,6 @@ bool SaraN200::getRSSIAndBER(int8_t* rssi, uint8_t* ber) {
 
     println("AT+CSQ");
 
-    auto csqParser = [&](ResponseType response, const char* buffer, size_t size, int* csqResult, int* berResult) {
-        if (!rssi || !ber) {
-            return ResponseError;
-        }
-
-        if (sscanf(buffer, "+CSQ: %d,%d", rssi, ber) == 2) {
-            return ResponseEmpty;
-        }
-
-        return ResponseError;
-    };
-
     if (readResponse<int, int>(csqParser, &csqRaw, &berRaw) == ResponseOK) {
         *rssi = (csqRaw == 99) ? 0 : convertCSQ2RSSI(csqRaw);
         *ber = (berRaw == 99 || static_cast<size_t>(berRaw) >= sizeof(berValues)) ? 0 : berValues[berRaw];
@@ -231,6 +219,18 @@ bool SaraN200::getRSSIAndBER(int8_t* rssi, uint8_t* ber) {
     }
 
     return false;
+}
+
+ResponseType SaraN200::csqParser(ResponseType& response, const char* buffer, size_t size, int* csqResult, int* berResult) {
+    if (!csqResult || !berResult) {
+        return ResponseError;
+    }
+
+    if (sscanf(buffer, "+CSQ: %d,%d", csqResult, berResult) == 2) {
+        return ResponseEmpty;
+    }
+
+    return ResponseError;
 }
 
 int8_t SaraN200::convertCSQ2RSSI(uint8_t csq) const {
@@ -247,28 +247,28 @@ int SaraN200::createSocket(uint8_t localPort, bool enableURC) {
     print(",");
     println(enableURC ? "1" : "0");
 
-    auto socketParser = [&](REsponseType response, const char* buffer, size_t size, int* socketFd, int* unused) {
-        if (!socketFd) {
-            return ResponseError;
-        }
-
-        if (sscanf(buffer, "%d", socketFd) == 1) {
-            return ResponseEmpty;
-        }
-
-        return ResponseError;
-    }
-
     int fd = -1;
 
-    if (readResponse<int, int>(socketParser, &fd, NULL) == ResponseOK) {
+    if (readResponse<int, int>(createSocketParser, &fd, NULL) == ResponseOK) {
         return fd;
     }
 
     return -1;
 }
 
-int SaraN200::socetSendTo(int socket, IPAddress ip, uint8_t port, uint8_t* buffer, size_t size) {
+ResponseType SaraN200::createSocketParser(ResponseType& response, const char* buffer, size_t size, int* socketFd, int* unused) {
+    if (!socketFd) {
+        return ResponseError;
+    }
+
+    if (sscanf(buffer, "%d", socketFd) == 1) {
+        return ResponseEmpty;
+    }
+
+    return ResponseError;
+}
+
+int SaraN200::socketSendTo(int socket, IPAddress ip, uint8_t port, uint8_t* buffer, size_t size) {
     print("AT+NSOST=");
     print(socket);
     print(",");
@@ -287,35 +287,36 @@ int SaraN200::socetSendTo(int socket, IPAddress ip, uint8_t port, uint8_t* buffe
 
     int usedSocket = -1;
     int sendLength = -1;
-    auto socketSendParser = [&](ResponseType response, char* buffer, size_t size, int* fd, int* length) {
-        if (!fd || !length) {
-            return ResponseError;
-        }
 
-        if (sscanf("%d,%d", fd, length) == 2) {
-            return ResponseEmpty;
-        }
-
-        return ResponseError;
-    };
-
-    if (readResponse<int, int>(socketSendParser, &usedSocket, &sendLength) == ResponseOK) {
+    if (readResponse<int, int>(socketSendToParser, &usedSocket, &sendLength) == ResponseOK) {
         return sendLength;
     }
 
     return -1;
 }
 
+ResponseType SaraN200::socketSendToParser(ResponseType& response, const char* buffer, size_t size, int* socketFd, int* length) {
+    if (!socketFd || !length) {
+        return ResponseError;
+    }
+
+    if (sscanf(buffer, "%d,%d", socketFd, length) == 2) {
+        return ResponseEmpty;
+    }
+
+    return ResponseError;
+}
+
 int SaraN200::socketRecvFrom(int socket, uint8_t* buffer, size_t size) {
     print("AT+NSORF=");
     print(socket);
-    print(",")
+    print(",");
     println(size * 2);
 
     char* response = new char[556];
     size_t outSize = 0;
 
-    if (readResponse(response, 556, NULL, NULL, NULL, &outSize, timeout) == ResponseOK) {
+    if (readResponse(response, 556, NULL, NULL, NULL, &outSize, 5000) == ResponseOK) {
         int parsedSize = 0;
         int remainingSize = 0;
         int fromSocketFd = -1;
@@ -323,7 +324,7 @@ int SaraN200::socketRecvFrom(int socket, uint8_t* buffer, size_t size) {
         char* retrievedData = new char[513];
         int fromPort = 0;
 
-        if (sscanf("%d,%s,%d,%d,%s,%d", fromSocketFd, fromIp, fromPort, parsedSize, retrievedData, remainingSize) != 6) {
+        if (sscanf(response, "%d,%s,%d,%d,%s,%d", fromSocketFd, fromIp, fromPort, parsedSize, retrievedData, remainingSize) != 6) {
             delete response;
             delete fromIp;
             delete retrievedData;
@@ -418,32 +419,7 @@ bool SaraN200::checkAndApplyNconfig() {
 
     println("AT+NCONFIG?");
 
-    auto nconfigParser = [&](ResponseType response, char* buffer, size_t size, bool* result, uint8_t* unused) {
-        if (!result) {
-            return ResponseError;
-        }
-
-        char name[32] = {0};
-        char value[32] = {0};
-
-        if (sscanf(buffer, "+NCONFIG: %[^,],%[^\r]", name, value) == 2) {
-            for (uint8_t i = 0; i < nConfigCount; i++) {
-                if (strcmp(nConfig[i].Name, name) == 0) {
-                    if (strcmp(nConfig[i].Value, value) == 0) {
-                        result[i] = true;
-
-                        break;
-                    }
-                }
-            }
-
-            return ResponsePendingExtra;
-        }
-
-        return ResponseError;
-    };
-
-    if (readResponse<bool, uint8_t>(nconfigParser, applyParamResult, NULL) == ResponseOK) {
+    if (readResponse<bool, uint8_t>(checkAndApplyNconfigParser, applyParamResult, NULL) == ResponseOK) {
         for (uint8_t i = 0; i < nConfigCount; i++) {
             debugPrint(nConfig[i].Name);
             if (!applyParamResult[i]) {
@@ -460,6 +436,31 @@ bool SaraN200::checkAndApplyNconfig() {
     return false;
 }
 
+ResponseType SaraN200::checkAndApplyNconfigParser(ResponseType& response, const char* buffer, size_t size, bool* result, uint8_t* unused) {
+    if (!result) {
+        return ResponseError;
+    }
+
+    char name[32] = {0};
+    char value[32] = {0};
+
+    if (sscanf(buffer, "+NCONFIG: %[^,],%[^\r]", name, value) == 2) {
+        for (uint8_t i = 0; i < nConfigCount; i++) {
+            if (strcmp(nConfig[i].Name, name) == 0) {
+                if (strcmp(nConfig[i].Value, value) == 0) {
+                    result[i] = true;
+
+                    break;
+                }
+            }
+        }
+
+        return ResponsePendingExtra;
+    }
+
+    return ResponseError;
+}
+
 void SaraN200::reboot() {
     println("AT+NRB");
 
@@ -468,6 +469,6 @@ void SaraN200::reboot() {
     }
 }
 
-bool SaraN200::startsWIth(const char* pre, const char* str) {
+bool SaraN200::startsWith(const char* pre, const char* str) {
     return (strncmp(pre, str, strlen(pre)) == 0);
 }

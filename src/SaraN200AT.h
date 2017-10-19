@@ -69,7 +69,7 @@ protected:
     size_t writeByte(uint8_t value);
     size_t print(const __FlashStringHelper*);
     size_t print(const String&);
-    size_t print(const char[]);
+    size_t print(const char*);
     size_t print(char);
     size_t print(unsigned char, int = DEC);
     size_t print(int, int = DEC);
@@ -81,7 +81,7 @@ protected:
 
     size_t println(const __FlashStringHelper*);
     size_t println(const String&);
-    size_t println(const char[]);
+    size_t println(const char*);
     size_t println(char);
     size_t println(unsigned char, int = DEC);
     size_t println(int, int = DEC);
