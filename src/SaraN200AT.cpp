@@ -1,6 +1,13 @@
 #include "SaraN200AT.h"
 
-SaraN200AT::SaraN200AT(Stream* stream):
+#define debugPrintLn(...) { if (this->debugEnabled && this->debugStream) this->debugStream->println(__VA_ARGS__); }
+#define debugPrint(...) { if (this->debugEnabled && this->debugStream) this->debugStream->print(__VA_ARGS__); }
+
+#define CR "\r"
+#define LF "\n"
+#define CRLF "\r\n"
+
+SaraN200AT::SaraN200AT():
 modemStream(stream),
 debugStream(NULL),
 debugEnabled(false),
@@ -52,6 +59,13 @@ void SaraN200AT::setInputBufferSize(size_t value) {
     this->inputBufferSize = value;
 }
 
+void SaraN200AT::setModemStream(Stream& stream) {
+    this->modemStream = &stream;
+}
+
+void SaraN200AT::setModemStream(Stream* stream) {
+    this->modemStream = stream;
+}
 
 void SaraN200AT::initBuffer() {
     if (!isInputBufferInitialized) {

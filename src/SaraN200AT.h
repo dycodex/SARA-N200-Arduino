@@ -17,7 +17,7 @@ typedef enum {
 
 class SaraN200AT {
 public:
-    SaraN200AT(Stream* stream);
+    SaraN200AT();
     ~SaraN200AT();
 
     void setDebugStream(Stream* debug);
@@ -41,6 +41,8 @@ protected:
     uint32_t startOn;
     bool appendCommand;
 
+    void setModemStream(Stream& stream);
+    void setModemStream(Stream* stream);
 
     // implement this on the actual class
     virtual bool isAlive() = 0;
