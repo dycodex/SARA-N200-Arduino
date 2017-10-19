@@ -5,6 +5,13 @@
 #include <stdint.h>
 #include <Stream.h>
 
+#define debugPrintln(...) { if (this->debugEnabled && this->debugStream) this->debugStream->println(__VA_ARGS__); }
+#define debugPrint(...) { if (this->debugEnabled && this->debugStream) this->debugStream->print(__VA_ARGS__); }
+
+#define CR "\r"
+#define LF "\n"
+#define CRLF "\r\n"
+
 typedef enum {
     ResponseNotFound = 0,
     ResponseOK,
