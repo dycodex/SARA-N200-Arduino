@@ -1,5 +1,21 @@
 #include "SaraN200AT.h"
 
+#define debugPrintln(...)  { if (this->debugEnabled && this->debugStream) this->debugStream->println(__VA_ARGS__); }
+#define debugPrint(...)  { if (this->debugEnabled && this->debugStream) this->debugStream->print(__VA_ARGS__); }
+
+#define CR "\r"
+#define LF "\n"
+#define CRLF "\r\n"
+
+#define SARA_AT_DEVICE_TERMINATOR CRLF
+
+#ifndef SARA_AT_DEVICE_TERMINATOR
+#warning "SARA_AT_DEVICE_TERMINATOR is not set"
+#define SARA_AT_DEVICE_TERMINATOR CRLF
+#endif
+
+#define SARA_AT_DEVICE_TERMINATOR_LEN (sizeof(SARA_AT_DEVICE_TERMINATOR) - 1) // without the NULL terminator
+
 SaraN200AT::SaraN200AT():
 debugStream(NULL),
 debugEnabled(false),
@@ -121,11 +137,16 @@ size_t SaraN200AT::readBytes(uint8_t* buffer, size_t length, uint32_t timeout) {
 }
 
 size_t SaraN200AT::readln(char* buffer, size_t size, uint32_t timeout) {
-    size_t len = readBytesUntil('\n', buffer, size - 1, timeout);
+    size_t len = readBytesUntil(SARA_AT_DEVICE_TERMINATOR[SARA_AT_DEVICE_TERMINATOR_LEN - 1], buffer, size - 1, timeout);
 
     if (buffer[len - 1] == '\r') {
         len -= 1;
     }
+
+    if ((SARA_AT_DEVICE_TERMINATOR_LEN > 1) && (buffer[len - (SARA_AT_DEVICE_TERMINATOR_LEN - 1)] == SARA_AT_DEVICE_TERMINATOR[0])) {
+        len -= SARA_AT_DEVICE_TERMINATOR_LEN - 1;
+    }
+
 
     buffer[len] = '\0';
 
@@ -138,7 +159,7 @@ size_t SaraN200AT::readln() {
 
 void SaraN200AT::writeProlog() {
     if (!appendCommand) {
-        // TODO: actually print prolog to debug stream
+        debugPrint(">> ");
         appendCommand = true;
     }
 }
@@ -149,72 +170,73 @@ size_t SaraN200AT::writeByte(uint8_t value) {
 
 size_t SaraN200AT::print(const __FlashStringHelper* fsh) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(fsh);
     return modemStream->print(fsh);
 }
 
 size_t SaraN200AT::print(const String& buffer) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(buffer);
     return modemStream->print(buffer);
 }
 
 size_t SaraN200AT::print(const char* buffer) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(buffer);
     return modemStream->print(buffer);
 }
 
 size_t SaraN200AT::print(char c) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(c);
     return modemStream->print(c);
 }
 
 size_t SaraN200AT::print(unsigned char uc, int base) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(uc, base);
     return modemStream->print(uc, base);
 }
 
 size_t SaraN200AT::print(int i, int base) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(i, base);
     return modemStream->print(i, base);
 }
 
 size_t SaraN200AT::print(unsigned int ui, int base) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(ui, base);
     return modemStream->print(ui, base);
 }
 
 size_t SaraN200AT::print(long l, int base) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(l, base);
     return modemStream->print(l, base);
 }
 
 
 size_t SaraN200AT::print(unsigned long ul, int base) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(ul, base);
     return modemStream->print(ul, base);
 }
 
 size_t SaraN200AT::print(double d, int base) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(d, base);
     return modemStream->print(d, base);
 }
 
 size_t SaraN200AT::print(const Printable& printable) {
     writeProlog();
-    // TODO: print debug
+    debugPrint(printable);
     return modemStream->print(printable);
 }
 
 size_t SaraN200AT::println(const __FlashStringHelper* ifsh) {
+    debugPrintln("");
     size_t n = print(ifsh);
     n += println();
     return n;
@@ -277,7 +299,7 @@ size_t SaraN200AT::println(const Printable& x) {
 }
 
 size_t SaraN200AT::println(void) {
-    // TODO: print debug
+    debugPrintln("");
     size_t i = print('\r');
     appendCommand = false;
     return i;

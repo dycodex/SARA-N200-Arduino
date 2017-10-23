@@ -1,5 +1,8 @@
 #include "SaraN200.h"
 
+#define debugPrintln(...) { if (this->debugEnabled && this->debugStream) this->debugStream->println(__VA_ARGS__); }
+#define debugPrint(...)  { if (this->debugEnabled && this->debugStream) this->debugStream->print(__VA_ARGS__); }
+
 #define STR_AT "AT"
 #define STR_RESPONSE_OK "OK"
 #define STR_RESPONSE_ERROR "ERROR"
@@ -20,7 +23,7 @@
 
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
-#define DEFAULT_CID "1"
+#define DEFAULT_CID "0"
 
 #define SOCKET_FAIL -1
 
@@ -44,8 +47,11 @@ static inline bool is_timedout(uint32_t from, uint32_t nr_ms)
 SaraN200::SaraN200(): SaraN200AT() {
 }
 
+uint32_t SaraN200::getDefaultBaudrate() {
+    return 9600;
+}
+
 bool SaraN200::isAlive() {
-    debugEnabled = false;
     println(STR_AT);
 
     return readResponse(NULL, 450) == ResponseOK;
@@ -106,7 +112,6 @@ ResponseType SaraN200::readResponse(char* buffer, size_t size, CallbackMethodPtr
                 if (parserResponse != ResponsePendingExtra) {
                     parserMethod = 0;
                 }
-
             }
 
             if (response != ResponseNotFound) {
@@ -166,6 +171,20 @@ bool SaraN200::disconnect() {
     return readResponse(NULL, 40 * 1000) == ResponseOK;
 }
 
+bool SaraN200::autoconnect() {
+    if (!on()) {
+        return false;
+    }
+
+    reboot();
+
+    if (!waitForSignalQuality(30 * 1000)) {
+        return false;
+    }
+
+    return waitForGprs(30 * 1000);
+}
+
 bool SaraN200::connect(const char* apn) {
     if (!on()) {
         return false;
@@ -190,10 +209,6 @@ bool SaraN200::connect(const char* apn) {
     }
 
     if (!setRadioActive(true)) {
-        return false;
-    }
-
-    if (!waitForSignalQuality()) {
         return false;
     }
 
@@ -241,7 +256,7 @@ uint8_t SaraN200::convertRSSI2CSQ(int8_t rssi) const {
     return (rssi + 113) / 2;
 }
 
-int SaraN200::createSocket(uint8_t localPort, bool enableURC) {
+int SaraN200::createSocket(uint16_t localPort, bool enableURC) {
     print("AT+NSOCR=DGRAM,17,");
     print(localPort);
     print(",");
@@ -261,14 +276,14 @@ ResponseType SaraN200::createSocketParser(ResponseType& response, const char* bu
         return ResponseError;
     }
 
-    if (sscanf(buffer, "%d", socketFd) == 1) {
+    if (sscanf(buffer, "%d\r", socketFd) == 1) {
         return ResponseEmpty;
     }
 
     return ResponseError;
 }
 
-int SaraN200::socketSendTo(int socket, IPAddress ip, uint8_t port, uint8_t* buffer, size_t size) {
+int SaraN200::socketSendTo(int socket, IPAddress ip, uint16_t port, uint8_t* buffer, size_t size) {
     print("AT+NSOST=");
     print(socket);
     print(",");
@@ -277,6 +292,7 @@ int SaraN200::socketSendTo(int socket, IPAddress ip, uint8_t port, uint8_t* buff
     print(port);
     print(",");
     print(size);
+    print(",");
 
     for (size_t i = 0; i < size; i++) {
         print(static_cast<char>(NIBBLE_TO_HEX_CHAR(HIGH_NIBBLE(buffer[i]))));
@@ -313,53 +329,44 @@ int SaraN200::socketRecvFrom(int socket, uint8_t* buffer, size_t size) {
     print(",");
     println(size * 2);
 
-    char* response = new char[556];
-    size_t outSize = 0;
-
-    if (readResponse(response, 556, NULL, NULL, NULL, &outSize, 5000) == ResponseOK) {
-        int parsedSize = 0;
-        int remainingSize = 0;
-        int fromSocketFd = -1;
-        char* fromIp = new char[48];
-        char* retrievedData = new char[513];
-        int fromPort = 0;
-
-        if (sscanf(response, "%d,%s,%d,%d,%s,%d", fromSocketFd, fromIp, fromPort, parsedSize, retrievedData, remainingSize) != 6) {
-            delete response;
-            delete fromIp;
-            delete retrievedData;
+    UdpDownlinkMesssage downlink;
+    bool gotMessage = 0;
+    if (readResponse<UdpDownlinkMesssage, bool>(socketRecvFromParser, &downlink, &gotMessage) == ResponseOK) {
+        if (!gotMessage) {
             return -1;
         }
 
-        debugPrint("[recv] Got data from: ");
-        debugPrint(fromIp);
-        debugPrint(". Size: ");
-        debugPrintln(parsedSize);
-        debugPrint("[recv] Data: ");
-        debugPrintln(retrievedData);
-
-        for (int i = 0; i < parsedSize * 2; i += 2) {
-            char h = retrievedData[i];
-            char l = retrievedData[i + 1];
+        for (int i = 0; i < downlink.dataLength * 2; i += 2) {
+            char h = downlink.data[i];
+            char l = downlink.data[i + 1];
 
             char convertedByte = HEX_PAIR_TO_BYTE(h, l);
             *buffer++ = static_cast<uint8_t>(convertedByte);
         }
 
-        delete retrievedData;
-        delete fromIp;
-        delete response;
-
-        return parsedSize;
+        return downlink.dataLength;
     }
-
-    delete response;
 
     return -1;
 }
 
+ResponseType SaraN200::socketRecvFromParser(ResponseType& response, const char* buffer, size_t size, UdpDownlinkMesssage* result, bool* gotResponse) {
+    if (!result) {
+        return ResponseError;
+    }
+
+    if (sscanf(buffer, "%d,%[0-9.],%d,%d,%[0-9a-fA-F],%d", &result->socket, result->fromIp, &result->fromPort, &result->dataLength, result->data, &result->remaining) == 6) {
+        *gotResponse = true;
+        return ResponseEmpty;
+    }
+
+    *gotResponse = false;
+    return ResponseError;
+}
+
 bool SaraN200::closeSocket(int socket) {
-    println("AT+NSOCL=1");
+    print("AT+NSOCL=");
+    println(socket);
 
     return readResponse() == ResponseOK;
 }
@@ -369,17 +376,15 @@ bool SaraN200::waitForSignalQuality(uint32_t timeout) {
     int8_t rssi;
     uint8_t ber;
 
-    uint32_t delayCount = 500;
+    uint32_t interval = 2000;
 
     while (!is_timedout(start, timeout)) {
-        if (getRSSIAndBER(&rssi, &ber)) {
-            if (rssi != 0) {
-                return true;
+        if (millis() % interval == 0) {
+            if (getRSSIAndBER(&rssi, &ber)) {
+                if (rssi != 0) {
+                    return true;
+                }
             }
-        }
-
-        if (delayCount < 5000) {
-            delayCount += 1000;
         }
     }
 
@@ -471,4 +476,19 @@ void SaraN200::reboot() {
 
 bool SaraN200::startsWith(const char* pre, const char* str) {
     return (strncmp(pre, str, strlen(pre)) == 0);
+}
+
+bool SaraN200::waitForGprs(uint32_t timeout) {
+    uint32_t start = millis();
+    uint32_t interval = 2000;
+
+    while (!is_timedout(start, timeout)) {
+        if (millis() % interval == 0) {
+            if (isConnected()) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

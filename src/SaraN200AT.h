@@ -5,13 +5,6 @@
 #include <stdint.h>
 #include <Stream.h>
 
-#define debugPrintln(...) { if (this->debugEnabled && this->debugStream) this->debugStream->println(__VA_ARGS__); }
-#define debugPrint(...) { if (this->debugEnabled && this->debugStream) this->debugStream->print(__VA_ARGS__); }
-
-#define CR "\r"
-#define LF "\n"
-#define CRLF "\r\n"
-
 typedef enum {
     ResponseNotFound = 0,
     ResponseOK,
@@ -25,7 +18,7 @@ typedef enum {
 class SaraN200AT {
 public:
     SaraN200AT();
-    ~SaraN200AT();
+    virtual ~SaraN200AT() {}
 
     void setDebugStream(Stream* debug);
     void setDebugEnabled(bool state);

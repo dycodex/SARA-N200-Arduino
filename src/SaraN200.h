@@ -10,6 +10,15 @@ typedef struct NameValuePair {
     const char* Value;
 } NameValuePair;
 
+typedef struct UdpDownlinkMesssage {
+    int socket;
+    char fromIp[48];
+    uint16_t fromPort;
+    size_t dataLength;
+    char data[512];
+    size_t remaining;
+} UdpDownlinkMesssage;
+
 class SaraN200 : public SaraN200AT {
 public:
     SaraN200();
@@ -20,7 +29,8 @@ public:
     void init(Stream* stream);
     bool setRadioActive(bool on);
     bool isAlive();
-    uint32_t getDefaultBaudRate() { return 9600; }
+    virtual uint32_t getDefaultBaudrate();
+    bool autoconnect();
     bool createContext(const char* apn);
     bool connect(const char* apn);
     bool disconnect();
@@ -29,8 +39,8 @@ public:
     int8_t convertCSQ2RSSI(uint8_t csq) const;
     uint8_t convertRSSI2CSQ(int8_t rssi) const;
 
-    int createSocket(uint8_t localPort = 42000, bool enableURC = false);
-    int socketSendTo(int socket, IPAddress ip, uint8_t port, uint8_t* buffer, size_t size);
+    int createSocket(uint16_t localPort = 42000, bool enableURC = false);
+    int socketSendTo(int socket, IPAddress ip, uint16_t port, uint8_t* buffer, size_t size);
     int socketRecvFrom(int socket, uint8_t* buffer, size_t size);
     bool closeSocket(int socket);
 
@@ -66,6 +76,7 @@ protected:
 private:
     static bool startsWith(const char* pre, const char* str);
     bool waitForSignalQuality(uint32_t timeout = 30 * 1000);
+    bool waitForGprs(uint32_t timeout = 30 * 1000);
     bool attachGprs(uint32_t timeout = 30 * 1000);
     bool setConfigParam(const char* param, const char* value);
     bool checkAndApplyNconfig();
@@ -76,6 +87,7 @@ private:
     static ResponseType createSocketParser(ResponseType& response, const char* buffer, size_t size, int* socketFd, int* unused);
     static ResponseType socketSendToParser(ResponseType& response, const char* buffer, size_t size, int* socketFd, int* length);
     static ResponseType checkAndApplyNconfigParser(ResponseType& response, const char* buffer, size_t size, bool* result, uint8_t* unused);
+    static ResponseType socketRecvFromParser(ResponseType& response, const char* buffer, size_t size, UdpDownlinkMesssage* result, bool* indicator);
 };
 
 #endif
