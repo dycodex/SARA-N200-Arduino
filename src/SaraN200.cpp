@@ -340,6 +340,16 @@ int SaraN200::socketRecvFrom(int socket, uint8_t* buffer, size_t size) {
             return -1;
         }
 
+        if (downlink.socket != socket) {
+            debugPrintln("Socket mismatch.");
+            debugPrint("Expected: ");
+            debugPrint(socket);
+            debugPrint(". Actual: ");
+            debugPrintln(downlink.socket);
+
+            return -1;
+        }
+
         for (int i = 0; i < downlink.dataLength * 2; i += 2) {
             char h = downlink.data[i];
             char l = downlink.data[i + 1];
@@ -359,7 +369,7 @@ ResponseType SaraN200::socketRecvFromParser(ResponseType& response, const char* 
         return ResponseError;
     }
 
-    if (sscanf(buffer, "%d,%[0-9.],%d,%d,%[0-9a-fA-F],%d", &result->socket, result->fromIp, &result->fromPort, &result->dataLength, result->data, &result->remaining) == 6) {
+    if (sscanf(buffer, "%d,%[0-9.],%hu,%d,%[0-9a-fA-F],%u", &result->socket, result->fromIp, &result->fromPort, &result->dataLength, result->data, &result->remaining) == 6) {
         *gotResponse = true;
         return ResponseEmpty;
     }

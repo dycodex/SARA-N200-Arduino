@@ -30,8 +30,8 @@ public:
     virtual uint16_t remotePort();
 
 private:
-    int socket;
     SaraN200* sara;
+    int socket;
     IPAddress rmtIp;
     uint16_t rmtPort;
     char* tx_buffer;

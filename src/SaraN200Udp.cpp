@@ -1,12 +1,13 @@
 #include "SaraN200Udp.h"
 
 SaraUDP::SaraUDP(SaraN200& sara):
+ sara(&sara),
  socket(-1),
  rmtPort(0),
  tx_buffer(0),
  tx_buffer_len(0),
- rx_buffer(0),
- sara(&sara) {}
+ rx_buffer(0)
+ {}
 
 SaraUDP::~SaraUDP() {
     stop();

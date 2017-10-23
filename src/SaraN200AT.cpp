@@ -17,13 +17,11 @@
 #define SARA_AT_DEVICE_TERMINATOR_LEN (sizeof(SARA_AT_DEVICE_TERMINATOR) - 1) // without the NULL terminator
 
 SaraN200AT::SaraN200AT():
-debugStream(NULL),
-debugEnabled(false),
-inputBuffer(0),
-inputBufferSize(250),
-isInputBufferInitialized(false) {
-    isInputBufferInitialized = false;
-}
+ debugStream(NULL),
+ debugEnabled(false),
+ inputBufferSize(250),
+ isInputBufferInitialized(false),
+ inputBuffer(0) {}
 
 void SaraN200AT::setDebugStream(Stream* debug) {
     this->debugStream = debug;
