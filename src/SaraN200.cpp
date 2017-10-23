@@ -176,6 +176,10 @@ bool SaraN200::autoconnect() {
         return false;
     }
 
+    if (!checkAndApplyNconfig()) {
+        return false;
+    }
+
     reboot();
 
     if (!waitForSignalQuality(30 * 1000)) {
@@ -327,7 +331,7 @@ int SaraN200::socketRecvFrom(int socket, uint8_t* buffer, size_t size) {
     print("AT+NSORF=");
     print(socket);
     print(",");
-    println(size * 2);
+    println(size);
 
     UdpDownlinkMesssage downlink;
     bool gotMessage = 0;
