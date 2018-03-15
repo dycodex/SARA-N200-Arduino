@@ -22,22 +22,6 @@ public:
 	    size_t remaining;
 	} UdpDownlinkMesssage;
 
-	typedef struct NUEStats {
-	    int signalPower;
-	    int totalPower;
-	    int TXPower;
-	    int TXTime;
-	    int RXTime;
-	    int cellID;
-	    int DLMCS;
-	    int ULMCS;
-	    int DCIMCS;
-	    int ECL;
-	    int SNR;
-	    int EARFCN;
-	    int PCI;
-	} NUEStats;
-
     SaraN200();
     virtual ~SaraN200() {}
 
