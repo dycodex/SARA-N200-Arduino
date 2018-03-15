@@ -5,22 +5,39 @@
 #include <Stream.h>
 #include "SaraN200AT.h"
 
-typedef struct NameValuePair {
-    const char* Name;
-    const char* Value;
-} NameValuePair;
-
-typedef struct UdpDownlinkMesssage {
-    int socket;
-    char fromIp[48];
-    uint16_t fromPort;
-    size_t dataLength;
-    char data[512];
-    size_t remaining;
-} UdpDownlinkMesssage;
-
 class SaraN200 : public SaraN200AT {
 public:
+
+	typedef struct NameValuePair {
+	    const char* Name;
+	    const char* Value;
+	} NameValuePair;
+
+	typedef struct UdpDownlinkMesssage {
+	    int socket;
+	    char fromIp[48];
+	    uint16_t fromPort;
+	    size_t dataLength;
+	    char data[512];
+	    size_t remaining;
+	} UdpDownlinkMesssage;
+
+	typedef struct NUEStats {
+	    int signalPower;
+	    int totalPower;
+	    int TXPower;
+	    int TXTime;
+	    int RXTime;
+	    int cellID;
+	    int DLMCS;
+	    int ULMCS;
+	    int DCIMCS;
+	    int ECL;
+	    int SNR;
+	    int EARFCN;
+	    int PCI;
+	} NUEStats;
+
     SaraN200();
     virtual ~SaraN200() {}
 
@@ -43,6 +60,8 @@ public:
     int socketSendTo(int socket, IPAddress ip, uint16_t port, uint8_t* buffer, size_t size);
     int socketRecvFrom(int socket, uint8_t* buffer, size_t size);
     bool closeSocket(int socket);
+
+    void printCurrentUEStats();
 
 protected:
     ResponseType readResponse(char* buffer, size_t size, size_t* outSize, uint32_t timeout = 5000) {

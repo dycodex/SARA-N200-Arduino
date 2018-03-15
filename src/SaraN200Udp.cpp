@@ -103,14 +103,10 @@ int SaraUDP::parsePacket() {
         return 0;
     }
 
-    uint8_t *buffer = new uint8_t[512];
-    if (!buffer) {
-        return 0;
-    }
+    uint8_t buffer[512] = {0};
 
     int readLength = sara->socketRecvFrom(socket, buffer, 512);
     if (readLength == -1) {
-        delete buffer;
         return 0;
     }
 

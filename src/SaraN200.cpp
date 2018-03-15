@@ -32,7 +32,7 @@
 #define NOW (uint32_t)millis()
 
 static const int nConfigCount = 3;
-static NameValuePair nConfig[nConfigCount] = {
+static SaraN200::NameValuePair nConfig[nConfigCount] = {
     {"AUTOCONNECT", "TRUE"},
     {"CR_0354_0338_SCRAMBLING", "TRUE"},
     {"CR_0859_SI_AVOID", "TRUE"}
@@ -82,18 +82,12 @@ ResponseType SaraN200::readResponse(char* buffer, size_t size, CallbackMethodPtr
                 *outSize = count;
             }
 
-            if (!debugEnabled && strncmp(buffer, "OK", 2) != 0) {
-                debugEnabled = true;
-            }
-
             debugPrint("[read response]: ");
             debugPrintln(buffer);
 
             if (startsWith(STR_AT, buffer)) {
                 continue;
             }
-
-            debugEnabled = true;
 
             if (startsWith(STR_RESPONSE_OK, buffer)) {
                 return ResponseOK;
