@@ -145,7 +145,6 @@ size_t SaraN200AT::readln(char* buffer, size_t size, uint32_t timeout) {
         len -= SARA_AT_DEVICE_TERMINATOR_LEN - 1;
     }
 
-
     buffer[len] = '\0';
 
     return len;

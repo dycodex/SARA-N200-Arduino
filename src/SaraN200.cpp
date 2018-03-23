@@ -31,11 +31,15 @@
 
 #define NOW (uint32_t)millis()
 
-static const int nConfigCount = 3;
+
+static const int nConfigCount = 6;
 static SaraN200::NameValuePair nConfig[nConfigCount] = {
-    {"AUTOCONNECT", "TRUE"},
-    {"CR_0354_0338_SCRAMBLING", "TRUE"},
-    {"CR_0859_SI_AVOID", "TRUE"}
+    {"\"AUTOCONNECT\"", "\"TRUE\""},
+    {"\"CR_0354_0338_SCRAMBLING\"", "\"TRUE\""},
+    {"\"CR_0859_SI_AVOID\"", "\"TRUE\""},
+    {"\"COMBINE_ATTACH\"", "\"TRUE\""},
+    {"\"CELL_RESELECTION\"", "\"TRUE\""},
+    {"\"ENABLE_BIP\"", "\"TRUE\""},
 };
 
 static inline bool is_timedout(uint32_t from, uint32_t nr_ms) __attribute__((always_inline));
@@ -165,25 +169,28 @@ bool SaraN200::disconnect() {
     return readResponse(NULL, 40 * 1000) == ResponseOK;
 }
 
-bool SaraN200::autoconnect() {
+bool SaraN200::autoconnect(bool turnOffRadioFirst) {
     if (!on()) {
         return false;
     }
 
-    if (!checkAndApplyNconfig()) {
+    if (turnOffRadioFirst) {
+        if (!checkAndApplyNconfig()) {
+            return false;
+        }
+
+        disconnect();
+        reboot();
+    }
+
+    if (!waitForSignalQuality(60 * 1000)) {
         return false;
     }
 
-    reboot();
-
-    if (!waitForSignalQuality(30 * 1000)) {
-        return false;
-    }
-
-    return waitForGprs(30 * 1000);
+    return waitForGprs(60 * 1000);
 }
 
-bool SaraN200::connect(const char* apn) {
+bool SaraN200::connect(const char* apn, bool noAutoconnect) {
     if (!on()) {
         return false;
     }
@@ -192,7 +199,7 @@ bool SaraN200::connect(const char* apn) {
         return false;
     }
 
-    if (!checkAndApplyNconfig()) {
+    if (!checkAndApplyNconfig(noAutoconnect)) {
         return false;
     }
 
@@ -204,6 +211,10 @@ bool SaraN200::connect(const char* apn) {
 
     if (isConnected()) {
         return true;
+    }
+
+    if (!createContext(apn)) {
+        return false;
     }
 
     if (!setRadioActive(true)) {
@@ -255,7 +266,7 @@ uint8_t SaraN200::convertRSSI2CSQ(int8_t rssi) const {
 }
 
 int SaraN200::createSocket(uint16_t localPort, bool enableURC) {
-    print("AT+NSOCR=DGRAM,17,");
+    print("AT+NSOCR=\"DGRAM\",17,");
     print(localPort);
     print(",");
     println(enableURC ? "1" : "0");
@@ -284,19 +295,20 @@ ResponseType SaraN200::createSocketParser(ResponseType& response, const char* bu
 int SaraN200::socketSendTo(int socket, IPAddress ip, uint16_t port, uint8_t* buffer, size_t size) {
     print("AT+NSOST=");
     print(socket);
-    print(",");
+    print(",\"");
     print(ip.toString());
-    print(",");
+    print("\",");
     print(port);
     print(",");
     print(size);
     print(",");
+    print("\"");
 
     for (size_t i = 0; i < size; i++) {
         print(static_cast<char>(NIBBLE_TO_HEX_CHAR(HIGH_NIBBLE(buffer[i]))));
         print(static_cast<char>(NIBBLE_TO_HEX_CHAR(LOW_NIBBLE(buffer[i]))));
     }
-
+    print("\"");
     println();
 
     int usedSocket = -1;
@@ -363,7 +375,7 @@ ResponseType SaraN200::socketRecvFromParser(ResponseType& response, const char* 
         return ResponseError;
     }
 
-    if (sscanf(buffer, "%d,%[0-9.],%hu,%d,%[0-9a-fA-F],%u", &result->socket, result->fromIp, &result->fromPort, &result->dataLength, result->data, &result->remaining) == 6) {
+    if (sscanf(buffer, "%d,\"%[0-9.]\",%hu,%d,\"%[0-9a-fA-F]\",%u", &result->socket, result->fromIp, &result->fromPort, &result->dataLength, result->data, &result->remaining) == 6) {
         *gotResponse = true;
         return ResponseEmpty;
     }
@@ -422,12 +434,13 @@ bool SaraN200::setConfigParam(const char* param, const char* value) {
     print("AT+NCONFIG=");
     print(param);
     print(",");
-    println(value);
+    print(value);
+    println();
 
     return readResponse() == ResponseOK;
 }
 
-bool SaraN200::checkAndApplyNconfig() {
+bool SaraN200::checkAndApplyNconfig(bool forceNoAutoconnect) {
     bool applyParamResult[nConfigCount];
 
     println("AT+NCONFIG?");
@@ -435,6 +448,13 @@ bool SaraN200::checkAndApplyNconfig() {
     if (readResponse<bool, uint8_t>(checkAndApplyNconfigParser, applyParamResult, NULL) == ResponseOK) {
         for (uint8_t i = 0; i < nConfigCount; i++) {
             debugPrint(nConfig[i].Name);
+
+            if (strcmp(nConfig[i].Name, "\"AUTOCONNECT\"") == 0 && forceNoAutoconnect) {
+                setConfigParam(nConfig[i].Name, "\"FALSE\"");
+                debugPrintln("... FORCING to FALSE");
+                continue;
+            }
+
             if (!applyParamResult[i]) {
                 debugPrintln("... CHANGE");
                 setConfigParam(nConfig[i].Name, nConfig[i].Value);
@@ -499,4 +519,34 @@ bool SaraN200::waitForGprs(uint32_t timeout) {
     }
 
     return false;
+}
+
+bool SaraN200::sleep() {
+    disconnect();
+    delay(100);
+    println("AT+CFUN=0");
+
+    return readResponse() == ResponseOK;
+}
+
+bool SaraN200::printThroughputInfo() {
+    debugEnabled = true;
+    delay(100);
+    println("AT+NUESTATS=\"THP\"");
+
+    bool ret = (readResponse() == ResponseOK);
+    debugEnabled = false;
+
+    return ret;
+}
+
+bool SaraN200::printCellStatsInfo() {
+    debugEnabled = true;
+    delay(100);
+    println("AT+NUESTATS=\"CELL\"");
+
+    bool ret = (readResponse() == ResponseOK);
+    debugEnabled = false;
+
+    return ret;
 }

@@ -8,19 +8,19 @@
 class SaraN200 : public SaraN200AT {
 public:
 
-	typedef struct NameValuePair {
-	    const char* Name;
-	    const char* Value;
-	} NameValuePair;
+    typedef struct NameValuePair {
+        const char* Name;
+        const char* Value;
+    } NameValuePair;
 
-	typedef struct UdpDownlinkMesssage {
-	    int socket;
-	    char fromIp[48];
-	    uint16_t fromPort;
-	    size_t dataLength;
-	    char data[512];
-	    size_t remaining;
-	} UdpDownlinkMesssage;
+    typedef struct UdpDownlinkMesssage {
+        int socket;
+        char fromIp[48];
+        uint16_t fromPort;
+        size_t dataLength;
+        char data[512];
+        size_t remaining;
+    } UdpDownlinkMesssage;
 
     SaraN200();
     virtual ~SaraN200() {}
@@ -33,7 +33,7 @@ public:
     virtual uint32_t getDefaultBaudrate();
     bool autoconnect();
     bool createContext(const char* apn);
-    bool connect(const char* apn);
+    bool connect(const char* apn, bool noAutoconnect = true);
     bool disconnect();
     bool isConnected();
     bool getRSSIAndBER(int8_t* rssi, uint8_t* ber);
@@ -45,7 +45,10 @@ public:
     int socketRecvFrom(int socket, uint8_t* buffer, size_t size);
     bool closeSocket(int socket);
 
-    void printCurrentUEStats();
+    bool sleep();
+
+    bool printThroughputInfo();
+    bool printCellStatsInfo();
 
 protected:
     ResponseType readResponse(char* buffer, size_t size, size_t* outSize, uint32_t timeout = 5000) {
@@ -82,7 +85,7 @@ private:
     bool waitForGprs(uint32_t timeout = 30 * 1000);
     bool attachGprs(uint32_t timeout = 30 * 1000);
     bool setConfigParam(const char* param, const char* value);
-    bool checkAndApplyNconfig();
+    bool checkAndApplyNconfig(bool forceNoAutoconnect = false);
     void reboot();
 
     static ResponseType cgAttParser(ResponseType& response, const char* buffer, size_t size, uint8_t* result, uint8_t* unused);
